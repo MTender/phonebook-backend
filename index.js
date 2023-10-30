@@ -17,54 +17,50 @@ const contactsPath = '/api/persons'
 const infoPath = '/api/info'
 
 app.get(contactsPath, (req, res) => {
-    Contact.find({}).then(contacts => {
-        res.json(contacts)
-    })
+
+    Contact.find({})
+        .then(contacts => {
+            res.json(contacts)
+        })
 })
 
 app.get(`${contactsPath}/:id`, (req, res, next) => {
     Contact.findById(req.params.id)
         .then(contact => {
+            if (!contact) return res.status(404).end()
+
             res.json(contact)
         })
         .catch(error => next(error))
 })
 
-app.post(contactsPath, (req, res) => {
+app.post(contactsPath, (req, res, next) => {
     const body = req.body
-
-    if (!body.number) {
-        return res.status(400).json({error: 'number field missing'})
-    }
-    if (!body.name) {
-        return res.status(400).json({error: 'name field missing'})
-    }
-
-    // const existingContact = contacts.find(contact => contact.name === body.name)
-    // if (existingContact) {
-    //     return res.status(400).json({error: `contact from the name ${body.name} already exists`})
-    // }
 
     const contact = new Contact({
         name: body.name,
         number: body.number
     })
 
-    contact.save().then(savedContact => {
-        res.json(savedContact)
-    })
+    contact.save()
+        .then(savedContact => {
+            res.json(savedContact)
+        })
+        .catch(error => next(error))
 })
 
 app.put(`${contactsPath}/:id`, (req, res, next) => {
-    const body = req.body
+    const {name, number} = req.body
+    console.log(name, number)
 
-    const contact = {
-        name: body.name,
-        number: body.number
-    }
-
-    Contact.findByIdAndUpdate(req.params.id, contact, {new: true})
+    Contact.findByIdAndUpdate(
+        req.params.id,
+        {name, number},
+        {new: true, runValidators: true, context: 'query'}
+    )
         .then(updatedContact => {
+            if (!updatedContact) throw {name: 'MissingIdError'}
+
             res.json(updatedContact)
         })
         .catch(error => next(error))
@@ -79,9 +75,10 @@ app.delete(`${contactsPath}/:id`, (req, res, next) => {
 })
 
 app.get(infoPath, (req, res) => {
-    Contact.countDocuments({}).then(count => {
-        res.send(`Phonebook has info for ${count} people<br/>${new Date()}`)
-    })
+    Contact.countDocuments({})
+        .then(count => {
+            res.send(`Phonebook has info for ${count} people<br/>${new Date()}`)
+        })
 })
 
 app.use((req, res) => res.status(404).end())
@@ -89,8 +86,10 @@ app.use((req, res) => res.status(404).end())
 const errorHandler = (error, req, res, next) => {
     console.error(error.message)
 
-    if (error.name === 'CastError') {
-        return res.status(400).send({error: 'malformed id'})
+    if (error.name === 'CastError' || error.name === 'MissingIdError') {
+        return res.status(400).json({error: 'malformed id'})
+    } else if (error.name === 'ValidationError') {
+        return res.status(400).json({name: error.name, message: error.message})
     }
 
     next(error)
