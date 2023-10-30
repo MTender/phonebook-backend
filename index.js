@@ -1,6 +1,7 @@
 import express from "express";
 import morgan from "morgan";
 import cors from "cors";
+import Contact from "./models/contact.js";
 
 const app = express()
 
@@ -12,49 +13,24 @@ morgan.token('body', (req,) => JSON.stringify(req.body))
 const morganFormat = morgan(':method :url :status :res[content-length] - :response-time ms :body')
 app.use(morganFormat)
 
-let persons = [
-    {
-        "id": 1,
-        "name": "Arto Hellas",
-        "number": "040-123456"
-    },
-    {
-        "id": 2,
-        "name": "Ada Lovelace",
-        "number": "39-44-5323523"
-    },
-    {
-        "id": 3,
-        "name": "Dan Abramov",
-        "number": "12-43-234345"
-    },
-    {
-        "id": 4,
-        "name": "Mary Poppendieck",
-        "number": "39-23-6423122"
-    }
-]
-
-const personsPath = '/api/persons'
+const contactsPath = '/api/persons'
 const infoPath = '/api/info'
 
-app.get(personsPath, (req, res) => {
-    res.json(persons)
+app.get(contactsPath, (req, res) => {
+    Contact.find({}).then(contacts => {
+        res.json(contacts)
+    })
 })
 
-app.get(`${personsPath}/:id`, (req, res) => {
-    const id = Number(req.params.id)
-
-    const person = persons.find(person => person.id === id)
-
-    if (!person) {
-        return res.status(404).end()
-    }
-
-    res.json(person)
+app.get(`${contactsPath}/:id`, (req, res, next) => {
+    Contact.findById(req.params.id)
+        .then(contact => {
+            res.json(contact)
+        })
+        .catch(error => next(error))
 })
 
-app.post(personsPath, (req, res) => {
+app.post(contactsPath, (req, res) => {
     const body = req.body
 
     if (!body.number) {
@@ -64,38 +40,64 @@ app.post(personsPath, (req, res) => {
         return res.status(400).json({error: 'name field missing'})
     }
 
-    const existingPerson = persons.find(person => person.name === body.name)
-    if (existingPerson) {
-        return res.status(400).json({error: `person by the name of ${body.name} already exists`})
-    }
+    // const existingContact = contacts.find(contact => contact.name === body.name)
+    // if (existingContact) {
+    //     return res.status(400).json({error: `contact from the name ${body.name} already exists`})
+    // }
 
-    const person = {
-        id: Math.floor(Math.random() * 100000),
+    const contact = new Contact({
+        name: body.name,
+        number: body.number
+    })
+
+    contact.save().then(savedContact => {
+        res.json(savedContact)
+    })
+})
+
+app.put(`${contactsPath}/:id`, (req, res, next) => {
+    const body = req.body
+
+    const contact = {
         name: body.name,
         number: body.number
     }
 
-    persons = persons.concat(person)
-
-    res.json(person)
+    Contact.findByIdAndUpdate(req.params.id, contact, {new: true})
+        .then(updatedContact => {
+            res.json(updatedContact)
+        })
+        .catch(error => next(error))
 })
 
-app.delete(`${personsPath}/:id`, (req, res) => {
-    const id = Number(req.params.id)
-
-    persons = persons.filter(person => person.id !== id)
-
-    res.status(204).end()
+app.delete(`${contactsPath}/:id`, (req, res, next) => {
+    Contact.findByIdAndDelete(req.params.id)
+        .then(() => {
+            res.status(204).end()
+        })
+        .catch(error => next(error))
 })
 
 app.get(infoPath, (req, res) => {
-    res.send(`Phonebook has info for ${persons.length} people<br/>${new Date()}`
-    )
+    Contact.countDocuments({}).then(count => {
+        res.send(`Phonebook has info for ${count} people<br/>${new Date()}`)
+    })
 })
 
 app.use((req, res) => res.status(404).end())
 
-const PORT = process.env.PORT || 3001
+const errorHandler = (error, req, res, next) => {
+    console.error(error.message)
+
+    if (error.name === 'CastError') {
+        return res.status(400).send({error: 'malformed id'})
+    }
+
+    next(error)
+}
+app.use(errorHandler)
+
+const PORT = process.env.PORT
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`)
 })
