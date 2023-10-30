@@ -1,7 +1,7 @@
-import express from "express";
-import morgan from "morgan";
-import cors from "cors";
-import Contact from "./models/contact.js";
+import express from 'express'
+import morgan from 'morgan'
+import cors from 'cors'
+import Contact from './models/contact.js'
 
 const app = express()
 
