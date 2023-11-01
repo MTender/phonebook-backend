@@ -59,7 +59,7 @@ app.put(`${contactsPath}/:id`, (req, res, next) => {
         {new: true, runValidators: true, context: 'query'}
     )
         .then(updatedContact => {
-            if (!updatedContact) throw {name: 'MissingIdError'}
+            if (!updatedContact) throw {name: 'InvalidIdError'}
 
             res.json(updatedContact)
         })
@@ -86,10 +86,10 @@ app.use((req, res) => res.status(404).end())
 const errorHandler = (error, req, res, next) => {
     console.error(error.message)
 
-    if (error.name === 'CastError' || error.name === 'MissingIdError') {
-        return res.status(400).json({error: 'malformed id'})
+    if (error.name === 'CastError' || error.name === 'InvalidIdError') {
+        return res.status(400).json({error: 'InvalidIdError', message: 'Invalid id'})
     } else if (error.name === 'ValidationError') {
-        return res.status(400).json({name: error.name, message: error.message})
+        return res.status(400).json({error: error.name, message: error.message})
     }
 
     next(error)
